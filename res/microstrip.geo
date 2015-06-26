@@ -1,0 +1,25 @@
+// Gmsh project created on Mon Apr  6 15:59:10 2015
+DefineConstant[ air = { 0.07, Label "Air Boundary Detail", Path "Gmsh/Parameters"}];
+DefineConstant[ si = { 0.05, Label "Substrate Boundary Detail", Path "Gmsh/Parameters"}];
+DefineConstant[ ms = { 0.02, Label "Microstrip Detail", Path "Gmsh/Parameters"}];
+DefineConstant[ h = { 0.2, Label "Substrate Thickness", Path "Gmsh/Parameters"}];
+DefineConstant[ w = { 0.8, Label "Microstrip Width", Path "Gmsh/Parameters"}];
+Point(1) = {0, h, 0, ms};
+Point(2) = {2, h, 0, si};
+Point(3) = {2, 2, 0, air};
+Point(4) = {0, 2, 0, air};
+Point(6) = {w, h, 0, ms};
+Point(7) = {2, 0, 0, si};
+Point(8) = {0, 0, 0, si};
+Line(1) = {4, 3};
+Line(2) = {3, 2};
+Line(3) = {2, 6};
+Line(4) = {4, 1};
+Line(5) = {1, 6};
+Line Loop(6) = {4, 5, -3, -2, -1};
+Plane Surface(7) = {6};
+Line(8) = {1, 8};
+Line(9) = {8, 7};
+Line(10) = {7, 2};
+Line Loop(11) = {9, 10, 3, -5, 8};
+Plane Surface(12) = {11};
