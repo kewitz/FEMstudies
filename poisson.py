@@ -26,22 +26,30 @@ SOFTWARE.
 
 from lib import *
 
-nodes, elements = readMesh('./res/microstrip.msh')
+nodes, elements = parsemesh('./res/rele.msh')
 nn = len(nodes)
 ne = len(elements)
 
 mi0, eps0 = (4*pi*1E-7), 8.854187817E-12
+
 # Configura materiais
-# Superfícies: 7 = ar, 12 = semicondutor
+# Material padrão Ar em todos os elementos.
+for e in [es for es in elements]:
+    e.mat = 1./(1.0*mi0)
+# Muda o material do relè.
 materiais = {
-    7: 1.0,
-    12: 11.68
+    24: 1./(1000*mi0),
+    26: 1./(1000*mi0)
 }
 for superficie in materiais:
     valor = materiais[superficie]
     for elemento in elementsOnSurface(elements, superficie):
         elemento.mat = valor
+# Adiciona densidade de carga no enrolamento.
+for e in elementsOnSurface(elements, 22):
+    e.f = 2000000
 
+# Variáveis
 Q = zeros(nn)
 V = zeros(nn)
 SS = zeros([nn, nn])
@@ -65,7 +73,7 @@ for e in [es for es in elements if es.dim is 2]:
     # Integração final do elemento.
     intE = JGrad.getT()*JGrad*detJ*.5*e.mat
     # Right-side da equação.
-    NjF = N*detJ*.5
+    NjF = N*detJ*.5*e.f
     # Preenche matriz Q.
     for s in enumerate(indexes):
         Q[s[1]] += NjF[s[0]]
@@ -75,13 +83,13 @@ for e in [es for es in elements if es.dim is 2]:
         SS[n1[1], n2[1]] += intE[n1[0], n2[0]]
 
 # Seta condições de contorno
-# Linhas 5 = microstrip
 contornos = {
     1: 0.0,
     2: 0.0,
-    9: 0.0,
-    10: 0.0,
-    5: 5.0
+    3: 0.0,
+    4: 0.0,
+    5: 0.0,
+    6: 0.0
 }
 for linha in contornos:
     valor = contornos[linha]

@@ -25,35 +25,78 @@ SOFTWARE.
 
 from numpy import *
 from matplotlib.patches import Polygon
+from scipy.interpolate import griddata
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 
-
 class Node(object):
-    def __init__(self, args):
-        self.i = int(args[0])-1
-        self.x, self.y = float(args[1]), float(args[2])
+    def __init__(self, args, tipo='msh'):
+        if tipo is 'msh':
+            self.i = int(args[0])-1
+            self.x, self.y = float(args[1]), float(args[2])
+        elif tipo is 'malha':
+            self.i = args[0]
+            args = args[1].split()
+            self.x, self.y = float(args[0]), float(args[1])
 
 
 class Element(object):
-    def __init__(self, args):
-        self.i = int(args[0])
-        i, typ, ntags = args[:3]
-        self.i, self.dim = int(i)-1, int(typ)
-        self.tags = [int(a) for a in args[3:3+int(ntags)]]
-        self.nodes = [int(a)-1 for a in args[3+int(ntags):]]
+    def __init__(self, args, tipo='msh'):
+        if tipo is 'msh':
+            self.i = int(args[0])
+            i, typ, ntags = args[:3]
+            self.i, self.dim = int(i)-1, int(typ)
+            self.tags = [int(a) for a in args[3:3+int(ntags)]]
+            self.nodes = [int(a)-1 for a in args[3+int(ntags):]]
+            self.mat = 1.0
+            self.f = 0.0
+        elif tipo is 'malha':
+            self.i = args[0]
+            args = args[1].split()
+            self.dim = 2
+            self.nodes = [int(a)-1 for a in args[:3]]
+            self.tags = [int(args[3])]
+            self.mat = 1.0
+            self.f = float(args[4])
 
 
-def readMesh(filename):
+def parsemesh(filename):
+    if '.malha' in filename:
+        return readmalha(filename)
+    elif '.msh' in filename:
+        return readmsh(filename)
+
+
+def readmalha(filename):
+    """
+    Processa um arquivo '.malha' do GilgaMesh e retorna o conjunto
+    (nós, elementos, contorno).
+
+    >>> nodes, elements, contorno = readmalha('mesh.malha')
+    """
+    assert '.malha' in filename, 'O arquivo precisa ser .malha'
+    with open(filename) as f:
+        lines = f.readlines()
+    nn, ne, nc = [int(val) for val in lines[0].split()]
+    nodes = [Node(n, tipo='malha') for n in enumerate(lines[1:nn+1])]
+    elements = [Element(e, tipo='malha')
+                for e in enumerate(lines[nn+1:nn+ne])]
+    boundaries = [(int(c.split()[0])-1, float(c.split()[1]))
+                  for c in lines[nn+ne+1:]]
+    return nodes, elements, boundaries
+
+
+def readmsh(filename):
     """
     Processa um arquivo '.msh' do GMesh e retorna o conjunto (nós, elementos).
 
     >>> nodes, elements = readMesh('mesh.msh')
     """
+    assert '.msh' in filename, 'O arquivo precisa ser .msh'
     with open(filename) as f:
         x = f.read()
-    ns, ne = x.find('$Nodes\n'), x.find('$EndNodes\n')
-    nodes = [Node(n.split()) for n in x[ns+7:ne].split('\n')[1:-1]]
+    nn, ne = x.find('$Nodes\n'), x.find('$EndNodes\n')
+    nodes = [Node(n.split()) for n in x[nn+7:ne].split('\n')[1:-1]]
     es, ee = x.find('$Elements\n'), x.find('$EndElements\n')
     elements = [Element(e.split()) for e in x[es+10:ee].split('\n')[1:-1]]
     return nodes, elements
@@ -91,3 +134,14 @@ def triangulate(nodes):
     x = points[:, 0]
     y = points[:, 1]
     return tri.Triangulation(x, y)
+
+
+def pdegrad(nodes, values, disc=1000):
+    points = matrix([[n.x, n.y] for n in nodes])
+    Xmax, Xmin = points[:,0].max(), points[:,0].min()
+    Ymax, Ymin = points[:,1].max(), points[:,1].min()
+    disc = (Xmax-Xmin)/disc
+    grid_x, grid_y = mgrid[Xmin:Xmax:disc, Ymin:Ymax:disc]
+    gdata = griddata(points, values, (grid_x, grid_y), method='linear')
+    Vx, Vy = gradient(gdata)
+    return Vx, Vy, grid_x, grid_y
